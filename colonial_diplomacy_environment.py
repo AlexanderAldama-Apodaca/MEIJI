@@ -211,7 +211,7 @@ class ColonialDiplomacyEnv(gym.Env):
         # Supply center ownership: {province: player_id}
         self.supply_centers: Dict[str, int] = {
             # Britain
-            "Delhi": 1, "Madras": 1, "Bombay": 1, "Hong Kong": 1, "Aden": 1, "Singapore": 1,
+            "Delhi": 1, "Madras": 1, "Bombay": 1, "Hong_Kong": 1, "Aden": 1, "Singapore": 1,
             # China
             "Peking": 2, "Shanghai": 2, "Canton": 2, "Manchuria": 2, "Sinkiang": 2,
             # France
@@ -221,28 +221,28 @@ class ColonialDiplomacyEnv(gym.Env):
             # Japan
             "Tokyo": 5, "Otaru": 5, "Kyushu": 5, "Kyoto": 5,
             # Russia
-            "Moscow": 6, "Omsk": 6, "Vladivostok": 6, "Odessa": 6, "Port Arthur": 6,
+            "Moscow": 6, "Omsk": 6, "Vladivostok": 6, "Odessa": 6, "Port_Arthur": 6,
             # Turkey
             "Angora": 7, "Baghdad": 7, "Constantinople": 7,
             # Neutral
-            "Assam": 0, "Bangkok": 0, "Bangkok east coast": 0, "Bangkok west coast": 0,
+            "Assam": 0, "Bangkok": 0, "Bangkok_east_coast": 0, "Bangkok_west_coast": 0,
             "Bengal": 0, "Cebu": 0, "Ceylon": 0, "Chungking": 0,
             "Davao": 0, "Egypt": 0, "Formosa": 0, "Fusan": 0,
             "Karachi": 0, "Kashgar": 0, "Kashmir": 0, "Malaya": 0,
-            "Mandalay": 0, "Manila": 0, "Mongolia": 0, "New Guinea": 0,
+            "Mandalay": 0, "Manila": 0, "Mongolia": 0, "New_Guinea": 0,
             "Persia": 0, "Rangoon": 0, "Rumania": 0, "Sakhalin": 0,
-            "Sarawak": 0, "Seoul": 0, "Seoul east coast": 0, "Seoul west coast": 0,
-            "Shiraz": 0, "Sudan": 0, "Tabriz": 0, "Tashkent": 0, "Upper Burma": 0
+            "Sarawak": 0, "Seoul": 0, "Seoul_east_coast": 0, "Seoul_west_coast": 0,
+            "Shiraz": 0, "Sudan": 0, "Tabriz": 0, "Tashkent": 0, "Upper_Burma": 0
         }
 
         self.supply_center_groups = {
-            "Bangkok": ["Bangkok", "Bangkok east coast", "Bangkok west coast"],
-            "Seoul": ["Seoul", "Seoul east coast", "Seoul west coast"]
-        }
+            "Bangkok": ["Bangkok", "Bangkok_east_coast", "Bangkok_west_coast"],
+            "Seoul": ["Seoul", "Seoul_east_coast", "Seoul_west_coast"]
+            }
 
         self.home_supply_centers: Dict[str, int] = {
             # Britain
-            "Delhi": 1, "Madras": 1, "Bombay": 1, "Hong Kong": 1, "Aden": 1, "Singapore": 1,
+            "Delhi": 1, "Madras": 1, "Bombay": 1, "Hong_Kong": 1, "Aden": 1, "Singapore": 1,
             # China
             "Peking": 2, "Shanghai": 2, "Canton": 2, "Manchuria": 2, "Sinkiang": 2,
             # France
@@ -252,7 +252,7 @@ class ColonialDiplomacyEnv(gym.Env):
             # Japan
             "Tokyo": 5, "Otaru": 5, "Kyushu": 5, "Kyoto": 5,
             # Russia
-            "Moscow": 6, "Omsk": 6, "Vladivostok": 6, "Odessa": 6, "Port Arthur": 6,
+            "Moscow": 6, "Omsk": 6, "Vladivostok": 6, "Odessa": 6, "Port_Arthur": 6,
             # Turkey
             "Angora": 7, "Baghdad": 7, "Constantinople": 7
         }
@@ -309,576 +309,596 @@ class ColonialDiplomacyEnv(gym.Env):
 
         self.tsr_path = ["Moscow", "Perm", "Omsk", "Krasnoyarsk", "Irkutsk", "Vladivostok"]
 
-        def move_unit(self, player_id: int, unit_index: int, destination: str) -> bool:
-            """
-            Attempts to move a unit to a destination province.
-            Returns True if the move succeeds, False otherwise.
-            """
+    def move_unit(self, player_id: int, unit_index: int, destination: str) -> bool:
+        """
+        Attempts to move a unit to a destination province.
+        Returns True if the move succeeds, False otherwise.
+        """
 
-            # Basic validation
-            if player_id not in self.units:
-                return False
-            
-            if unit_index < 0 or unit_index >= len(self.units[player_id]):
-                return False
-            
-            unit = self.units[player_id][unit_index]
-            unit_type = unit["type"]
-            origin = unit["location"]
-
-            # Province must exist
-            if destination not in self.provinces:
-                return False
-            
-            # Adjacency check
-            if origin not in self.adjacency:
-                return False
-            
-            if destination not in self.adjacency.get(origin, []):
-                return False
-            
-            # Terrain compatibility
-            if unit_type == "Army":
-                if destination in self.water_provinces:
-                    return False
-                
-            if unit_type == "Fleet":
-                if destination in self.land_provinces:
-                    return False
-                
-            # Execute move
-            unit["location"] = destination
-            return True
+        # Basic validation
+        if player_id not in self.units:
+            return False
         
-        def hold_unit(self, player_id: int, unit_index: int) -> bool:
-            """
-            Orders a unit to hold its current province.
-            Returns True if the order is valid.
-            """
-
-            # Validation
-            if player_id not in self.units:
-                return False
-            
-            if unit_index < 0 or unit_index >= len(self.units[player_id]):
-                return False
-            
-            unit = self.units[player_id][unit_index]
-
-            # Execute hold
-            return True
+        if unit_index < 0 or unit_index >= len(self.units[player_id]):
+            return False
         
-        def support_unit(self, supporter_pid: int, supporter_idx: int, supported_pid: int, supported_idx: int, supported_destination: str | None) -> bool:
-            """
-            Allows one unit (supporter) to support another unit (supported).
-            Adds +1 strength to the supported unit if legal.
+        unit = self.units[player_id][unit_index]
+        unit_type = unit["type"]
+        origin = unit["location"]
 
-            supported destination:
-            - None -> support holding
-            - str -> support movement to destination
-            """
-
-            # Validate player and unit IDs
-            if supporter_pid not in self.units or supported_pid not in self.units:
-                return False
-            
-            if supporter_idx < 0 or supporter_idx >= len(self.units[supporter_pid]):
-                return False
-            
-            if supported_idx < 0 or supported_idx >= len(self.units[supported_pid]):
-                return False
-            
-            supporter = self.units[supporter_pid][supporter_idx]
-            supported = self.units[supported_pid][supported_idx]
-
-            supporter_type = supporter["type"]
-            supporter_loc = supporter["location"]
-
-            supported_loc = supported["location"]
-
-            # Determine target province
-            if supported_destination is None:
-                # Support holding
-                target_province = supported_loc
-            else:
-                # Support movement
-                target_province = supported_destination
-
-            # Province must exist
-            if target_province not in self.provinces:
-                return False
-            
-            # Adjacency check
-            if supporter_loc not in self.adjacency:
-                return False
-            
-            if target_province not in self.adjacency.get(supporter_loc, []):
-                return False
-            
-            # Movement capability check
-            if supporter_type == "Army":
-                if target_province in self.water_provinces:
-                    return False
-                
-            if supporter_type == "Fleet":
-                if target_province in self.land_provinces:
-                    return False
-                
-            # Apply support
-            supported["strength"] += 1
-            return True
+        # Province must exist
+        if destination not in self.provinces:
+            return False
         
-        def convoy_army(self, army_pid: int, army_idx: int, destination: str) -> bool:
-            """
-            Allows an Army to move via convoy from one coast province to another
-            through a connected chain of Fleets in water provinces.
-            Returns True if the convoy succeeds.
-            """
+        # Adjacency check
+        if origin not in self.adjacency:
+            return False
+        
+        if destination not in self.adjacency.get(origin, []):
+            return False
+        
+        # Terrain compatibility
+        if unit_type == "Army":
+            if destination in self.water_provinces:
+                return False
+            
+        if unit_type == "Fleet":
+            if destination in self.land_provinces:
+                return False
+            
+        # Execute move
+        unit["location"] = destination
+        return True
+        
+    def hold_unit(self, player_id: int, unit_index: int) -> bool:
+        """
+        Orders a unit to hold its current province.
+        Returns True if the order is valid.
+        """
 
-            # Validate unit
-            if army_pid not in self.units:
-                return False
-            
-            if army_idx < 0 or army_idx >= len(self.units[army_pid]):
-                return False
-            
-            army = self.units[army_pid][army_idx]
+        # Validation
+        if player_id not in self.units:
+            return False
+        
+        if unit_index < 0 or unit_index >= len(self.units[player_id]):
+            return False
+        
+        unit = self.units[player_id][unit_index]
 
-            if army["type"] != "Army":
-                return False
-            
-            origin = army["location"]
+        # Execute hold
+        return True
+        
+    def support_unit(self, supporter_pid: int, supporter_idx: int, supported_pid: int, supported_idx: int, supported_destination: str | None) -> bool:
+        """
+        Allows one unit (supporter) to support another unit (supported).
+        Adds +1 strength to the supported unit if legal.
 
-            # Coast checks
-            if origin not in self.coast_provinces:
-                return False
-            
-            if destination not in self.coast_provinces:
-                return False
-            
-            # Province must exist
-            if destination not in self.provinces:
-                return False
-            
-            # Build set of water provinces with fleets
-            fleet_water_provinces = set()
+        supported destination:
+        - None -> support holding
+        - str -> support movement to destination
+        """
 
-            for units in self.units.values():
-                for unit in units:
-                    if unit["type"] == "Fleet":
-                        loc = unit["location"]
-                        if loc in self.water_provinces:
-                            fleet_water_provinces.add(loc)
+        # Validate player and unit IDs
+        if supporter_pid not in self.units or supported_pid not in self.units:
+            return False
+        
+        if supporter_idx < 0 or supporter_idx >= len(self.units[supporter_pid]):
+            return False
+        
+        if supported_idx < 0 or supported_idx >= len(self.units[supported_pid]):
+            return False
+        
+        supporter = self.units[supporter_pid][supporter_idx]
+        supported = self.units[supported_pid][supported_idx]
 
-            if not fleet_water_provinces:
+        supporter_type = supporter["type"]
+        supporter_loc = supporter["location"]
+
+        supported_loc = supported["location"]
+
+        # Determine target province
+        if supported_destination is None:
+            # Support holding
+            target_province = supported_loc
+        else:
+            # Support movement
+            target_province = supported_destination
+
+        # Province must exist
+        if target_province not in self.provinces:
+            return False
+        
+        # Adjacency check
+        if supporter_loc not in self.adjacency:
+            return False
+        
+        if target_province not in self.adjacency.get(supporter_loc, []):
+            return False
+        
+        # Movement capability check
+        if supporter_type == "Army":
+            if target_province in self.water_provinces:
                 return False
             
-            # Breadth-first search through fleets
-            visited = set()
-            queue = deque()
+        if supporter_type == "Fleet":
+            if target_province in self.land_provinces:
+                return False
+            
+        # Apply support
+        supported["strength"] += 1
+        return True
+        
+    def convoy_army(self, army_pid: int, army_idx: int, destination: str) -> bool:
+        """
+        Allows an Army to move via convoy from one coast province to another
+        through a connected chain of Fleets in water provinces.
+        Returns True if the convoy succeeds.
+        """
 
-            # Start from water provinces to origin coast
-            for adj in self.adjacency.get(origin, []):
-                if adj in fleet_water_provinces:
-                    queue.append(adj)
+        # Validate unit
+        if army_pid not in self.units:
+            return False
+        
+        if army_idx < 0 or army_idx >= len(self.units[army_pid]):
+            return False
+        
+        army = self.units[army_pid][army_idx]
+
+        if army["type"] != "Army":
+            return False
+        
+        origin = army["location"]
+
+        # Coast checks
+        if origin not in self.coast_provinces:
+            return False
+        
+        if destination not in self.coast_provinces:
+            return False
+        
+        # Province must exist
+        if destination not in self.provinces:
+            return False
+        
+        # Build set of water provinces with fleets
+        fleet_water_provinces = set()
+
+        for units in self.units.values():
+            for unit in units:
+                if unit["type"] == "Fleet":
+                    loc = unit["location"]
+                    if loc in self.water_provinces:
+                        fleet_water_provinces.add(loc)
+
+        if not fleet_water_provinces:
+            return False
+        
+        # Breadth-first search through fleets
+        visited = set()
+        queue = deque()
+
+        # Start from water provinces to origin coast
+        for adj in self.adjacency.get(origin, []):
+            if adj in fleet_water_provinces:
+                queue.append(adj)
+                visited.add(adj)
+
+        while queue:
+            current = queue.popleft()
+
+            # If this fleet borders the destination coast, convoy succeeds
+            if destination in self.adjacency.get(current, []):
+                army["location"] = destination
+                return True
+
+            # Continue searching fleet chain
+            for adj in self.adjacency.get(current, []):
+                if adj in fleet_water_provinces and adj not in visited:
                     visited.add(adj)
+                    queue.append(adj)
 
-            while queue:
-                current = queue.popleft()
-
-                # If this fleet borders the destination coast, convoy succeeds
-                if destination in self.adjacency.get(current, []):
-                    army["location"] = destination
-                    return True
-
-                # Continue searching fleet chain
-                for adj in self.adjacency.get(current, []):
-                    if adj in fleet_water_provinces and adj not in visited:
-                        visited.add(adj)
-                        queue.append(adj)
-
-            return False
+        return False
         
-        def get_unit_at(self, province: str):
-            for pid, unit_list in self.units.items():
-                for u in unit_list:
-                    if u["location"] == province:
-                        return pid, u
-            return None, None
+    def get_unit_at(self, province: str):
+        for pid, unit_list in self.units.items():
+            for u in unit_list:
+                if u["location"] == province:
+                    return pid, u
+        return None, None
 
-        def can_unit_move_to(self, unit_type: str, target: str) -> bool:
-            if unit_type == "Army":
-                return target in self.land_provinces or target in self.coast_provinces
-            elif unit_type == "Fleet":
-                return target in self.water_provinces or target in self.coast_provinces
-            return False
+    def can_unit_move_to(self, unit_type: str, target: str) -> bool:
+        if unit_type == "Army":
+            return target in self.land_provinces or target in self.coast_provinces
+        elif unit_type == "Fleet":
+            return target in self.water_provinces or target in self.coast_provinces
+        return False
         
-        def get_legal_retreat_locations(self, unit: Dict[str, object], attacker_origin: str, standoff_provinces: set) -> List[str]:
-            """
-            Returns all legal retreat provinces for a dislodged unit.
-            """
-            location = unit["location"]
-            unit_type = unit["type"]
+    def get_legal_retreat_locations(self, unit: Dict[str, object], attacker_origin: str, standoff_provinces: set) -> List[str]:
+        """
+        Returns all legal retreat provinces for a dislodged unit.
+        """
+        location = unit["location"]
+        unit_type = unit["type"]
 
-            # Adjacent provinces
-            neighbors = self.adjacency.get(location, [])
+        # Adjacent provinces
+        neighbors = self.adjacency.get(location, [])
 
-            # Build set of currently occupied provinces
-            occupied = set()
-            for _, units in self.units.items():
-                for u in units:
-                    occupied.add(u["location"])
-            
-            legal_retreats = []
-
-            for province in neighbors:
-                # Must be a place unit type could normally move
-                if not self.can_unit_move_to(unit_type, province):
-                    continue
-
-                # Cannot retreat into occupied province
-                if province in occupied:
-                    continue
-
-                # Cannot retreat into attacker origin
-                if province == attacker_origin:
-                    continue
-
-                # Cannot retreat into standoff province
-                if province in standoff_provinces:
-                    continue
-
-                legal_retreats.append(province)
-
-            return legal_retreats
+        # Build set of currently occupied provinces
+        occupied = set()
+        for _, units in self.units.items():
+            for u in units:
+                occupied.add(u["location"])
         
-        def retreat_unit(self, player_id: int, unit_location: str, attacker_origin: str, standoff_provinces: set, chosen_retreat: str | None) -> bool:
-            """
-            Handles retreating of a dislodged unit.
-            If chosen_retreat is None or illegal, and no legal options exist,
-            the unit is automatically disbanded.
-            """
+        legal_retreats = []
 
-            # Find the unit
-            player_units = self.units.get(player_id, [])
-            unit = next((u for u in player_units if u["location"] == unit_location), None)
-
-            legal = self.get_legal_retreat_locations(unit, attacker_origin, standoff_provinces)
-
-            # No retreats available
-            if not legal:
-                self.disband_unit(player_id, unit_location)
-                return False
-
-            # Declined retreat
-            if chosen_retreat is None:
-                self.disband_unit(player_id, unit_location)
-                return False
-
-            # Illegal retreat
-            if chosen_retreat not in legal:
-                self.disband_unit(player_id, unit_location)
-                return False
-            
-            # Perform retreat
-            unit["location"] = chosen_retreat
-            return True
-
-        def disband_unit(self, player_id: int, unit_idx: int) -> bool:
-            """
-            Removes a unit from the game.
-            Returns True if the unit was successfully disbanded.
-            """
-
-            # Validate player
-            if player_id not in self.units:
-                return False
-            
-            # Validate unit index
-            if unit_idx < 0 or unit_idx >= len(self.units[player_id]):
-                return False
-            
-            # Remove the unit
-            self.units[player_id].pop(unit_idx)
-
-            # Remove eliminated player
-            if len(self.units[player_id]) == 0:
-                del self.units[player_id]
-
-            return True
-        
-        def is_province_occupied(self, province: str) -> bool:
-            for units in self.units.values():
-                for unit in units:
-                    if unit["location"] == province:
-                        return True
-            return False
-        
-        def build_unit(self, player_id: int, province: str, unit_type: str) -> bool:
-            """
-            Attempts to build a unit for player_id at province.
-            Returns True if build succeeds.
-            """
-
-            # Phase check
-            if self.phase != "Build":
-                return False
-            
-            # Home supply center ownership check
-            if province not in self.home_supply_centers:
-                return False
-            
-            if self.home_supply_centers[province] != player_id:
-                return False
-            
-            # Province occupancy check
-            if self.is_province_occupied(province):
-                return False
-            
-            # Unit entitlement check
-            supply_count = sum(1 for p, owner in self.supply_centers.items() if owner == player_id)
-
-            unit_count = len(self.units.get(player_id, []))
-
-            if unit_count >= supply_count:
-                return False # No builds allowed
-            
-            # Unit type validation
-            if unit_type == "Army":
-                if province not in self.land_provinces and province not in self.coast_provinces:
-                    return False
-            
-            elif unit_type == "Fleet":
-                if province not in self.coast_provinces:
-                    return False
-                
-            else:
-                return False # Invalid unit type
-            
-            # Build the unit
-            new_unit = {
-                "type": unit_type,
-                "location": province,
-                "strength": 1
-            }
-
-            self.units[player_id].append(new_unit)
-
-            return True
-        
-        def use_trans_siberian_railroad(self, player_id: int, start_province: str, chosen_destination: str, standoff_provinces: set | None = None):
-            """
-            Executes a Trans-Siberian Railroad move.
-
-            Rules enforced:
-            - Only Russia (player 6)
-            - Only once per turn
-            - Unit must be an Army
-            - Must be on TSR line
-            - Must travel only along TSR line
-            - Can pass through Russian units
-            - Must stop before foreign occupied TSR provinces
-            - Cannot end in occupied province
-            - Must stop before standoff province
-            """
-
-            standoff_provinces = standoff_provinces or set()
-
-            if player_id != 6:
-                raise ValueError("Only Russia may use the Trans-Siberian Railroad.")
-            
-            if self.tsr_used_this_turn:
-                raise ValueError("TSR may only be used once per turn.")
-            
-            # Find the unit
-            unit_list = self.units.get(player_id, [])
-            unit = next((u for u in unit_list if u["location"] == start_province), None)
-
-            if unit is None:
-                raise ValueError("No Russian unit found  in starting TSR province.")
-            
-            if unit["type"] != "Army":
-                raise ValueError("Only Army units may use the TSR.")
-            
-            # Ensure start is on TSR
-            if start_province not in self.tsr_path:
-                raise ValueError("Unit is not on the Trans-Siberian Railroad line.")
-            
-            # Ensure destination is on TSR
-            if chosen_destination not in self.tsr_path:
-                raise ValueError("Destination is not on the TSR line.")
-            
-            # Determine direction of travel along TSR
-            start_index = self.tsr_path.index(start_province)
-            dest_index = self.tsr_path.index(chosen_destination)
-
-            if start_index == dest_index:
-                raise ValueError("Unit must move somewhere along the TSR.")
-            
-            # Determine traversal direction
-            step = 1 if dest_index > start_index else -1
-            path_segment = self.tsr_path[start_index + step : dest_index + step: step]
-
-            # Evaluate legality along path
-            final_stop = None
-
-            for province in path_segment:
-                pid, _ = self.get_unit_at(province)
-
-                # Standoff rule -> must stop before this province
-                if province in standoff_provinces:
-                    break
-
-                # Foreign army blocks TSR beyond it
-                if pid not in (None, 6):
-                    break
-
-                # If empty, it may be a valid stopping place
-                if pid is None:
-                    final_stop = province
-                
-                # If Russian unit may pass through but cannot end there, continue
+        for province in neighbors:
+            # Must be a place unit type could normally move
+            if not self.can_unit_move_to(unit_type, province):
                 continue
 
-            # If no legal empty stopping province
-            if final_stop is None:
-                raise ValueError("No valid TSR destination available.")
-            
-            # Must match chosen destination
-            if final_stop != chosen_destination:
-                raise ValueError(f"Illegal TSR order. Best legal destination is '{final_stop}', "f"but '{chosen_destination}' was ordered.")
-            
-            # Move the unit
-            unit["location"] = final_stop
+            # Cannot retreat into occupied province
+            if province in occupied:
+                continue
 
-            # TSR consumed for this turn
-            self.tsr_used_this_turn = True
-            
-            return final_stop
+            # Cannot retreat into attacker origin
+            if province == attacker_origin:
+                continue
+
+            # Cannot retreat into standoff province
+            if province in standoff_provinces:
+                continue
+
+            legal_retreats.append(province)
+
+        return legal_retreats
         
-        def get_controller_of_egypt(self):
-            """
-            Returns player_id controlling Egypt by occupation.
-            Must be physically occupied by that power.
-            Returns None if Egypt not occupied.
-            """
-            pid, unit = self.get_unit_at("Egypt")
-            return pid if pid is not None else None
-        
-        def grant_suez_permission(self, controller_id: int, foreign_player: int):
-            if controller_id not in self.suez_permissions:
-                self.suez_permissions[controller_id] = set()
-            self.suez_permissions[controller_id].add(foreign_player)
+    def retreat_unit(self, player_id: int, unit_location: str, attacker_origin: str, standoff_provinces: set, chosen_retreat: str | None) -> bool:
+        """
+        Handles retreating of a dislodged unit.
+        If chosen_retreat is None or illegal, and no legal options exist,
+        the unit is automatically disbanded.
+        """
 
-        def can_use_suez_canal(self, player_id: int, start: str, destination: str, egypt_dislodged: bool = False):
-            """
-            Determines if a given Fleet order across the Suez Canal is legal.
+        # Find the unit
+        player_units = self.units.get(player_id, [])
+        unit = next((u for u in player_units if u["location"] == unit_location), None)
 
-            start must be Mediterranean Sea or Red Sea
-            destination must be other side
-            """
+        # Find index instead of passing location
+        unit_idx = next((i for i, u in enumerate(player_units) if u["location"] == unit_location), None)
 
-            # Must be a Fleet
-            pid, unit = self.get_unit_at(start)
-            if pid != player_id or unit is None or unit["type"] != "Fleet":
-                return False
+        if unit_idx is None:
+            return False
 
-            # Must be correct canal movement
-            valid_pairs = {
-                ("Mediterranean_Sea", "Red_Sea"), ("Red_Sea", "Mediterranean_Sea")
-            }
-            if (start, destination) not in valid_pairs:
-                return False
-            
-            # Egypt must be controlled by occupation entire turn
-            controller = self.get_controller_of_egypt()
-            if controller is None:
-                return False
-            
-            # If same power controls Egypt, always allowed
-            if controller == player_id:
-                return True
-            
-            # Otherwise, need explicit Suez Canal permission
-            allowed = self.suez_permissions.get(controller, set())
-            if player_id in allowed:
-                return True
-            
+        legal = self.get_legal_retreat_locations(unit, attacker_origin, standoff_provinces)
+
+        # No retreats available
+        if not legal:
+            self.disband_unit(player_id, unit_idx) # changed from unit_location
+            return False
+
+        # Declined retreat
+        if chosen_retreat is None:
+            self.disband_unit(player_id, unit_idx) # changed from unit_location
+            return False
+
+        # Illegal retreat
+        if chosen_retreat not in legal:
+            self.disband_unit(player_id, unit_idx) # changed from unit_location
             return False
         
-        def execute_suez_move(self, player_id: int, start: str, destination: str, egypt_dislodged: bool = False):
-            legal, msg = self.can_use_suez_canal(player_id, start, destination, egypt_dislodged)
+        # Perform retreat
+        unit["location"] = chosen_retreat
+        return True
 
-            if not legal:
-                raise ValueError(f"Suez Canal rule violation: {msg}")
+    def disband_unit(self, player_id: int, unit_idx: int) -> bool:
+        """
+        Removes a unit from the game.
+        Returns True if the unit was successfully disbanded.
+        """
+
+        # Validate player
+        if player_id not in self.units:
+            return False
+        
+        # Validate unit index
+        if unit_idx < 0 or unit_idx >= len(self.units[player_id]):
+            return False
+        
+        # Remove the unit
+        self.units[player_id].pop(unit_idx)
+
+        # Remove eliminated player
+        if len(self.units[player_id]) == 0:
+            del self.units[player_id]
+
+        return True
+        
+    def is_province_occupied(self, province: str) -> bool:
+        for units in self.units.values():
+            for unit in units:
+                if unit["location"] == province:
+                    return True
+        return False
+        
+    def build_unit(self, player_id: int, province: str, unit_type: str) -> bool:
+        """
+        Attempts to build a unit for player_id at province.
+        Returns True if build succeeds.
+        """
+
+        # Phase check
+        if self.phase != "Build":
+            return False
+        
+        # Home supply center ownership check
+        if province not in self.home_supply_centers:
+            return False
+        
+        if self.home_supply_centers[province] != player_id:
+            return False
+        
+        # Province occupancy check
+        if self.is_province_occupied(province):
+            return False
+        
+        # Unit entitlement check
+        supply_count = sum(1 for p, owner in self.supply_centers.items() if owner == player_id)
+
+        unit_count = len(self.units.get(player_id, []))
+
+        if unit_count >= supply_count:
+            return False # No builds allowed
+        
+        # Unit type validation
+        if unit_type == "Army":
+            if province not in self.land_provinces and province not in self.coast_provinces:
+                return False
+        
+        elif unit_type == "Fleet":
+            if province not in self.coast_provinces:
+                return False
             
-            # Normal conflict rules still determine success
-            # This only sets allowed movement path
-            unit_pid, unit = self.get_unit_at(start)
-            unit["location"] = destination
+        else:
+            return False # Invalid unit type
+        
+        # Build the unit
+        new_unit = {
+            "type": unit_type,
+            "location": province,
+            "strength": 1
+        }
+
+        self.units[player_id].append(new_unit)
+
+        return True
+        
+    def use_trans_siberian_railroad(self, player_id: int, start_province: str, chosen_destination: str, standoff_provinces: set | None = None):
+        """
+        Executes a Trans-Siberian Railroad move.
+
+        Rules enforced:
+        - Only Russia (player 6)
+        - Only once per turn
+        - Unit must be an Army
+        - Must be on TSR line
+        - Must travel only along TSR line
+        - Can pass through Russian units
+        - Must stop before foreign occupied TSR provinces
+        - Cannot end in occupied province
+        - Must stop before standoff province
+        """
+
+        standoff_provinces = standoff_provinces or set()
+
+        if player_id != 6:
+            raise ValueError("Only Russia may use the Trans-Siberian Railroad.")
+        
+        if self.tsr_used_this_turn:
+            raise ValueError("TSR may only be used once per turn.")
+        
+        # Find the unit
+        unit_list = self.units.get(player_id, [])
+        unit = next((u for u in unit_list if u["location"] == start_province), None)
+
+        if unit is None:
+            raise ValueError("No Russian unit found  in starting TSR province.")
+        
+        if unit["type"] != "Army":
+            raise ValueError("Only Army units may use the TSR.")
+        
+        # Ensure start is on TSR
+        if start_province not in self.tsr_path:
+            raise ValueError("Unit is not on the Trans-Siberian Railroad line.")
+        
+        # Ensure destination is on TSR
+        if chosen_destination not in self.tsr_path:
+            raise ValueError("Destination is not on the TSR line.")
+        
+        # Determine direction of travel along TSR
+        start_index = self.tsr_path.index(start_province)
+        dest_index = self.tsr_path.index(chosen_destination)
+
+        if start_index == dest_index:
+            raise ValueError("Unit must move somewhere along the TSR.")
+        
+        # Determine traversal direction
+        step = 1 if dest_index > start_index else -1
+        path_segment = self.tsr_path[start_index + step : dest_index + step: step]
+
+        # Evaluate legality along path
+        final_stop = None
+
+        for province in path_segment:
+            pid, _ = self.get_unit_at(province)
+
+            # Standoff rule -> must stop before this province
+            if province in standoff_provinces:
+                break
+
+            # Foreign army blocks TSR beyond it
+            if pid not in (None, 6):
+                break
+
+            # If empty, it may be a valid stopping place
+            if pid is None:
+                final_stop = province
+            
+            # If Russian unit may pass through but cannot end there, continue
+            continue
+
+        # If no legal empty stopping province
+        if final_stop is None:
+            raise ValueError("No valid TSR destination available.")
+        
+        # Must match chosen destination
+        if final_stop != chosen_destination:
+            raise ValueError(f"Illegal TSR order. Best legal destination is '{final_stop}', "f"but '{chosen_destination}' was ordered.")
+        
+        # Move the unit
+        unit["location"] = final_stop
+
+        # TSR consumed for this turn
+        self.tsr_used_this_turn = True
+        
+        return final_stop
+        
+    def get_controller_of_egypt(self):
+        """
+        Returns player_id controlling Egypt by occupation.
+        Must be physically occupied by that power.
+        Returns None if Egypt not occupied.
+        """
+
+        for pid, units in self.units.items():
+            for unit in units:
+                if unit["location"] == "Egypt":
+                    return pid
+        return None
+        
+    def grant_suez_permission(self, controller_id: int, foreign_player: int):
+        if controller_id not in self.suez_permissions:
+            self.suez_permissions[controller_id] = set()
+        self.suez_permissions[controller_id].add(foreign_player)
+
+    def can_use_suez_canal(self, player_id: int, start: str, destination: str, egypt_dislodged: bool = False):
+        """
+        Determines if a given Fleet order across the Suez Canal is legal.
+
+        start must be Mediterranean Sea or Red Sea
+        destination must be other side
+        """
+
+        # Must be a Fleet
+        pid, unit = self.get_unit_at(start)
+        if pid != player_id or unit is None or unit["type"] != "Fleet":
+            return False
+
+        # Must be correct canal movement
+        valid_pairs = {
+            ("Mediterranean_Sea", "Red_Sea"), ("Red_Sea", "Mediterranean_Sea")
+        }
+        if (start, destination) not in valid_pairs:
+            return False
+        
+        # Egypt must be controlled by occupation entire turn
+        controller = self.get_controller_of_egypt()
+        if controller is None:
+            return False
+        
+        # If same power controls Egypt, always allowed
+        if controller == player_id:
             return True
-
-        def get_canonical_supply_center(self, province: str) -> str:
-            for canonical, variants in self.supply_center_groups.items():
-                if province in variants:
-                    return canonical
-            return province
         
-        def update_supply_center_control(self):
-            """
-            Updates supply center ownership after a Fall turn.
-            """
-            if self.phase != "Fall":
-                return
+        # Otherwise, need explicit Suez Canal permission
+        allowed = self.suez_permissions.get(controller, set())
+        if player_id in allowed:
+            return True
+        
+        return False
+        
+    def execute_suez_move(self, player_id: int, start: str, destination: str, egypt_dislodged: bool = False):
+        if not self.can_use_suez_canal(player_id, start, destination, egypt_dislodged):
+            raise ValueError("Suez Canal rule violation")
+        
+        # Normal conflict rules still determine success
+        # This only sets allowed movement path
+        unit_pid, unit = self.get_unit_at(start)
+        unit["location"] = destination
+        return True
+
+    def get_canonical_supply_center(self, province: str) -> str:
+        temp_province = province
+
+        if "Bangkok" in temp_province:
+            temp_province = "Bangkok"
+        elif "Seoul" in temp_province:
+            temp_province = "Seoul"
+        return temp_province
+        
+    def update_supply_center_control(self):
+        """
+        Updates supply center ownership after a Fall turn.
+        """
+        if self.phase != "Fall":
+            return
+        
+        # Track which supply centers are occupied and by whom
+        occupied_centers: Dict[str, int] = {}
+
+        for player_id, units in self.units.items():
+            for unit in units:
+                province = unit["location"]
+
+                canonical = self.get_canonical_supply_center(province)
+
+                if canonical in self.supply_centers:
+                    occupied_centers[canonical] = player_id
+                    
+        # Apply ownership changes
+        for sc in list(self.supply_centers.keys()):
+            canonical = self.get_canonical_supply_center(sc)
+
+            if canonical in occupied_centers:
+                new_owner = occupied_centers[canonical]
+
+                # Hong Kong special rule: China can never control Hong Kong
+                if canonical == "Hong_Kong" and new_owner == 2:
+                    continue
+
+                self.supply_centers[canonical] = new_owner
+
+    def count_supply_centers(self, player_id: int) -> int:
+        return sum(1 for owner in self.supply_centers.values() if owner == player_id)
+        
+    def start_new_turn(self):
+        self.tsr_used_this_turn = False
+        self.suez_permissions = {}
+
+    def check_victory(self) -> int | None:
+        """
+        Returns the winning player_id if someone has won, otherwise None.
+        """
+        for player_id in range(1, self.num_players + 1):
+            if self.count_supply_centers(player_id) >= 30:
+                return player_id
+        return None
+        
+    def end_of_fall_phase(self):
+        self.update_supply_center_control()
+
+        winner = self.check_victory()
+        if winner is not None:
+            self.done = True
+            self.winner = winner
+            return
             
-            # Track which supply centers are occupied and by whom
-            occupied_centers: Dict[str, int] = {}
+        self.phase = "Build"
 
-            for player_id, units in self.units.items():
-                for unit in units:
-                    province = unit["location"]
+    def main():
+        print("Creating Colonial Diplomacy Environment\n")
+        env = ColonialDiplomacyEnv()
+        print("Colonial Diplomacy Environment created!\n")
+        return 0
 
-                    canonical = self.get_canonical_supply_center(province)
-
-                    if canonical in self.supply_centers:
-                        occupied_centers[canonical] = player_id
-                        
-            # Apply ownership changes
-            for sc in list(self.supply_centers.keys()):
-                canonical = self.get_canonical_supply_center(sc)
-
-                if canonical in occupied_centers:
-                    new_owner = occupied_centers[canonical]
-
-                    # Hong Kong special rule: China can never control Hong Kong
-                    if canonical == "Hong_Kong" and new_owner == 2:
-                        continue
-
-                    self.supply_centers[canonical] = new_owner
-
-        def count_supply_centers(self, player_id: int) -> int:
-            return sum(1 for owner in self.supply_centers.values() if owner == player_id)
-        
-        def start_new_turn(self):
-            self.tsr_used_this_turn = False
-            self.suez_permissions = {}
-
-        def check_victory(self) -> int | None:
-            """
-            Returns the winning player_id if someone has won, otherwise None.
-            """
-            for player_id in range(1, self.num_players + 1):
-                if self.count_supply_centers(player_id) >= 30:
-                    return player_id
-            return None
-        
-        def end_of_fall_phase(self):
-            self.update_supply_center_control()
-
-            winner = self.check_victory()
-            if winner is not None:
-                self.done = True
-                self.winner = winner
-                return
-            
-            self.phase = "Build"
+if __name__ == "__main__":
+    ColonialDiplomacyEnv.main()
