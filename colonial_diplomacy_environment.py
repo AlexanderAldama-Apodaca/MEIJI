@@ -4,6 +4,11 @@ import numpy as np
 from typing import Dict, List, Tuple, Any
 from collections import deque
 
+from dataclasses import dataclass
+from collections import defaultdict
+
+import json
+
 class ColonialDiplomacyEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 4}
 
@@ -15,10 +20,24 @@ class ColonialDiplomacyEnv(gym.Env):
         self.num_players: int = self.config.get("num_players", 7) # Britain, China, France, Holland, Japan, Russia, Turkey
         self.max_years: int = self.config.get("max_years", 1908) # Colonial Diplomacy ends after 1908
         self.max_units: int = self.config.get("max_units", 58)
-        
+
+        # Game History Logging
+        self.history = []
+
         # Game State Variables
         self.year: int = 1870 # Colonial Diplomacy begins in 1870
-        self.phase: str = "Spring" # Spring / Fall / Retreat / Build
+        self.phase_index= 0
+
+        self.phase_cycle = [
+            "Spring_Movement",
+            "Spring_Retreat",
+            "Fall_Movement",
+            "Fall_Retreat",
+            "Winter_Adjustment"
+        ]
+
+        self.phase = self.phase_cycle[self.phase_index]
+
         self.done: bool = False
 
         self.tsr_used_this_turn: bool = False
@@ -303,200 +322,137 @@ class ColonialDiplomacyEnv(gym.Env):
             "Shiraz": 0, "Somaliland": 0, "Sudan": 0, "Upper_Burma": 0
         }
 
+        self.multi_coast_provinces = {
+            "Arabia": ["NC", "SC"],
+            "Bangkok": ["EC", "WC"],
+            "Seoul": ["EC", "WC"]
+        }
+
         self.trans_siberian_railroad: Dict[str, int] = {
             "Irkutsk": 6, "Krasnoyarsk": 6, "Moscow": 6, "Omsk": 6, "Perm": 6, "Vladivostok": 6
         }
 
         self.tsr_path = ["Moscow", "Perm", "Omsk", "Krasnoyarsk", "Irkutsk", "Vladivostok"]
 
-    def move_unit(self, player_id: int, unit_index: int, destination: str) -> bool:
-        """
-        Attempts to move a unit to a destination province.
-        Returns True if the move succeeds, False otherwise.
-        """
+    def validate_move_order(self, unit, destination):
+        current = unit["location"]
 
-        # Basic validation
-        if player_id not in self.units:
-            return False
-        
-        if unit_index < 0 or unit_index >= len(self.units[player_id]):
-            return False
-        
-        unit = self.units[player_id][unit_index]
-        unit_type = unit["type"]
-        origin = unit["location"]
-
-        # Province must exist
-        if destination not in self.provinces:
-            return False
-        
         # Adjacency check
-        if origin not in self.adjacency:
+        if destination not in self.adjacency.get(current, []):
             return False
         
-        if destination not in self.adjacency.get(origin, []):
-            return False
-        
-        # Terrain compatibility
-        if unit_type == "Army":
+        # Army movement rules
+        if unit["type"] == "Army":
             if destination in self.water_provinces:
                 return False
             
-        if unit_type == "Fleet":
+        # Fleet movement rules
+        elif unit["type"] == "Fleet":
             if destination in self.land_provinces:
                 return False
             
-        # Execute move
-        unit["location"] = destination
+            # Coast restrictions
+            if (
+                current in self.multi_coast_provinces
+                and destination in self.multi_coast_provinces
+            ):
+                if current == destination:
+                    return False
+
         return True
         
-    def hold_unit(self, player_id: int, unit_index: int) -> bool:
-        """
-        Orders a unit to hold its current province.
-        Returns True if the order is valid.
-        """
+    def validate_support_order(self, support_order, all_orders):
+        supporter_location = support_order.unit_location
+        support_unit = support_order.support_unit
+        support_target = support_order.support_target
 
-        # Validation
-        if player_id not in self.units:
-            return False
-        
-        if unit_index < 0 or unit_index >= len(self.units[player_id]):
-            return False
-        
-        unit = self.units[player_id][unit_index]
+        # Supported unit must exist
+        pid, unit = self.get_unit_at(support_unit)
 
-        # Execute hold
-        return True
+        if unit is None:
+            return False
         
-    def support_unit(self, supporter_pid: int, supporter_idx: int, supported_pid: int, supported_idx: int, supported_destination: str | None) -> bool:
-        """
-        Allows one unit (supporter) to support another unit (supported).
-        Adds +1 strength to the supported unit if legal.
+        # Supporter must be adjacent
+        if support_target not in self.adjacency.get(supporter_location, []):
+            return False
+        
+        # Supported move must exist
+        found = False
 
-        supported destination:
-        - None -> support holding
-        - str -> support movement to destination
-        """
+        for _, orders in all_orders.items():
+            for order in orders:
+                if (order.unit_location == support_unit
+                    and order.order_type == "MOVE"
+                    and order.target == support_target
+                    ):
+                    found = True
 
-        # Validate player and unit IDs
-        if supporter_pid not in self.units or supported_pid not in self.units:
-            return False
-        
-        if supporter_idx < 0 or supporter_idx >= len(self.units[supporter_pid]):
-            return False
-        
-        if supported_idx < 0 or supported_idx >= len(self.units[supported_pid]):
-            return False
-        
-        supporter = self.units[supporter_pid][supporter_idx]
-        supported = self.units[supported_pid][supported_idx]
+        return found
+    
+    def is_support_cut(self, support_order, move_orders):
+        supporter = support_order.unit_location
 
-        supporter_type = supporter["type"]
-        supporter_loc = supporter["location"]
+        protected_source = support_order.support_target
 
-        supported_loc = supported["location"]
+        for move in move_orders:
+            # Attack on supporter
+            if move.target != supporter:
+                continue
 
-        # Determine target province
-        if supported_destination is None:
-            # Support holding
-            target_province = supported_loc
-        else:
-            # Support movement
-            target_province = supported_destination
+            # Exception: supported unit attacking supporter
+            if move.unit_location == protected_source:
+                continue
 
-        # Province must exist
-        if target_province not in self.provinces:
-            return False
+            return True
         
-        # Adjacency check
-        if supporter_loc not in self.adjacency:
-            return False
+        return False
+    
+    def detect_head_to_head(self, move_a, move_b):
+        return (
+            move_a.unit_location == move_b.target
+            and move_a.target == move_b.unit_location
+        )
         
-        if target_province not in self.adjacency.get(supporter_loc, []):
-            return False
-        
-        # Movement capability check
-        if supporter_type == "Army":
-            if target_province in self.water_provinces:
-                return False
-            
-        if supporter_type == "Fleet":
-            if target_province in self.land_provinces:
-                return False
-            
-        # Apply support
-        supported["strength"] += 1
-        return True
-        
-    def convoy_army(self, army_pid: int, army_idx: int, destination: str) -> bool:
-        """
-        Allows an Army to move via convoy from one coast province to another
-        through a connected chain of Fleets in water provinces.
-        Returns True if the convoy succeeds.
-        """
+    def validate_convoy_order(self, convoy_order):
+        start = convoy_order.convoy_origin
+        destination = convoy_order.convoy_destination
 
-        # Validate unit
-        if army_pid not in self.units:
-            return False
-        
-        if army_idx < 0 or army_idx >= len(self.units[army_pid]):
-            return False
-        
-        army = self.units[army_pid][army_idx]
-
-        if army["type"] != "Army":
-            return False
-        
-        origin = army["location"]
-
-        # Coast checks
-        if origin not in self.coast_provinces:
-            return False
-        
-        if destination not in self.coast_provinces:
-            return False
-        
-        # Province must exist
-        if destination not in self.provinces:
-            return False
-        
-        # Build set of water provinces with fleets
-        fleet_water_provinces = set()
-
-        for units in self.units.values():
-            for unit in units:
-                if unit["type"] == "Fleet":
-                    loc = unit["location"]
-                    if loc in self.water_provinces:
-                        fleet_water_provinces.add(loc)
-
-        if not fleet_water_provinces:
-            return False
-        
-        # Breadth-first search through fleets
         visited = set()
-        queue = deque()
 
-        # Start from water provinces to origin coast
-        for adj in self.adjacency.get(origin, []):
-            if adj in fleet_water_provinces:
-                queue.append(adj)
-                visited.add(adj)
+        queue = [start]
 
         while queue:
-            current = queue.popleft()
+            current = queue.pop(0)
 
-            # If this fleet borders the destination coast, convoy succeeds
-            if destination in self.adjacency.get(current, []):
-                army["location"] = destination
+            if current == destination:
                 return True
+            
+            visited.add(current)
 
-            # Continue searching fleet chain
-            for adj in self.adjacency.get(current, []):
-                if adj in fleet_water_provinces and adj not in visited:
-                    visited.add(adj)
-                    queue.append(adj)
+            for adjacent in self.adjacency.get(current, []):
+                if adjacent in visited:
+                    continue
 
+                pid, unit = self.get_unit_at(adjacent)
+
+                if (
+                    unit is not None
+                    and unit["type"] == "Fleet"
+                ):
+                    queue.append(adjacent)
+
+        return False
+    
+    def is_convoy_disrupted(self, convoy_fleets, dislodged_units):
+        dislodged_locations = {
+            unit["location"]
+            for _, unit in dislodged_units
+        }
+
+        for fleet in convoy_fleets:
+            if fleet in dislodged_locations:
+                return True
+            
         return False
         
     def get_unit_at(self, province: str):
@@ -513,44 +469,29 @@ class ColonialDiplomacyEnv(gym.Env):
             return target in self.water_provinces or target in self.coast_provinces
         return False
         
-    def get_legal_retreat_locations(self, unit: Dict[str, object], attacker_origin: str, standoff_provinces: set) -> List[str]:
-        """
-        Returns all legal retreat provinces for a dislodged unit.
-        """
-        location = unit["location"]
-        unit_type = unit["type"]
+    def get_legal_retreat_locations(self, unit, attacked_provinces=None):
+        if attacked_provinces is None:
+            attacked_provinces = set()
 
-        # Adjacent provinces
-        neighbors = self.adjacency.get(location, [])
+        retreats = []
 
-        # Build set of currently occupied provinces
-        occupied = set()
-        for _, units in self.units.items():
-            for u in units:
-                occupied.add(u["location"])
-        
-        legal_retreats = []
+        current = unit["location"]
 
-        for province in neighbors:
-            # Must be a place unit type could normally move
-            if not self.can_unit_move_to(unit_type, province):
+        for adjacent in self.adjacency.get(current, []):
+            if adjacent in attacked_provinces:
                 continue
-
-            # Cannot retreat into occupied province
-            if province in occupied:
+            if self.is_province_occupied(adjacent):
                 continue
+            if unit["type"] == "Army":
+                if adjacent in self.water_provinces:
+                    continue
+            elif unit["type"] == "Fleet":
+                if adjacent in self.land_provinces:
+                    continue
 
-            # Cannot retreat into attacker origin
-            if province == attacker_origin:
-                continue
+            retreats.append(adjacent)
 
-            # Cannot retreat into standoff province
-            if province in standoff_provinces:
-                continue
-
-            legal_retreats.append(province)
-
-        return legal_retreats
+        return retreats
         
     def retreat_unit(self, player_id: int, unit_location: str, attacker_origin: str, standoff_provinces: set, chosen_retreat: str | None) -> bool:
         """
@@ -669,6 +610,18 @@ class ColonialDiplomacyEnv(gym.Env):
         }
 
         self.units[player_id].append(new_unit)
+
+        return True
+    
+    def validate_build(self, player_id, province):
+        if province not in self.home_supply_centers[player_id]:
+            return False
+        
+        if self.supply_centers.get(province) != player_id:
+            return False
+        
+        if self.is_province_occupied(province):
+            return False
 
         return True
         
@@ -825,6 +778,33 @@ class ColonialDiplomacyEnv(gym.Env):
         unit_pid, unit = self.get_unit_at(start)
         unit["location"] = destination
         return True
+    
+    def validate_all_orders(self, joint_orders):
+        valid_orders = {}
+
+        for pid, orders in joint_orders.items():
+            valid_orders[pid] = []
+
+            for order in orders:
+                _, unit = self.get_unit_at(order.unit_location)
+
+                if unit is None:
+                    continue
+
+                if order.order_type == "MOVE":
+                    if self.validate_move_order(unit, order.target):
+                        valid_orders[pid].append(order)
+
+                    elif order.order_type == "HOLD":
+                        valid_orders[pid].append(order)
+
+                    elif order.order_type == "SUPPORT":
+                        valid_orders[pid].append(order)
+
+                    elif order.order_type == "CONVOY":
+                        valid_orders[pid].append(order)
+
+            return valid_orders
 
     def get_canonical_supply_center(self, province: str) -> str:
         temp_province = province
@@ -894,6 +874,273 @@ class ColonialDiplomacyEnv(gym.Env):
             
         self.phase = "Build"
 
+    def export_state(self):
+        units_export = {}
+
+        for pid, units in self.units.items():
+            units_export[str(pid)] = []
+
+            for unit in units:
+                prefix = "A" if unit["type"] == "Army" else "F"
+                units_export[str(pid)].append(f"{prefix} {unit['location']}")
+        
+        centers_export = {}
+
+        for pid in range(1, self.num_players + 1):
+            owned = []
+
+            for province, owner in self.supply_centers.items():
+                if owner == pid:
+                    owned.append(province)
+
+            centers_export[str(pid)] = sorted(owned)
+
+        return {
+            "year": self.year,
+            "phase": self.phase,
+            "units": units_export,
+            "centers": centers_export
+        }
+    
+    def submit_orders(self, joint_orders):
+        """
+        joint_orders:
+        {
+            player_id: [Order, Order, ...]
+        }
+        """
+
+        self.pending_orders = self.validate_all_orders(joint_orders)
+
+    def resolve_orders(self):
+        """
+        Simultaneously adjudicate all movement orders.
+        """
+
+        move_orders = []
+        hold_orders = []
+        support_orders = []
+
+        order_results = {}
+
+        # Categorize orders
+        for pid, orders in self.pending_orders.items():
+            for order in orders:
+                if order.order_type == "MOVE":
+                    move_orders.append(order)
+                
+                elif order.order_type == "HOLD":
+                    hold_orders.append(order)
+                
+                elif order.order_type == "SUPPORT":
+                    support_orders.append(order)
+
+        # Compute support strengths
+        attack_strength = defaultdict(lambda: 1)
+        defense_strength = defaultdict(lambda: 1)
+
+        for order in support_orders:
+            if self.is_support_cut(order, move_orders):
+                continue
+
+            if not self.validate_support_order(order, self.pending_orders):
+                continue
+
+            attack_strength[(order.support_unit, order.support_target)] += 1
+
+        # Collect attacks by destination
+        attacks_by_destination = defaultdict(list)
+
+        for order in move_orders:
+            attacks_by_destination[order.target].append(order)
+        
+        successful_moves = []
+        bounced_moves = []
+
+        for i in range(len(move_orders)):
+            for j in range(i + 1, len(move_orders)):
+                a = move_orders[i]
+                b = move_orders[j]
+
+                if self.detect_head_to_head(a, b):
+                    strength_a = attack_strength[(a.unit_location, a.target)]
+                    strength_b = attack_strength[(b.unit_location, b.target)]
+
+                    if strength_a > strength_b:
+                        order_results[b.unit_location] = ["bounce"]
+
+                    elif strength_b > strength_a:
+                        order_results[a.unit_location] = ["bounce"]
+
+                    else:
+                        order_results[a.unit_location] = ["bounce"]
+                        order_results[b.unit_location] = ["bounce"]
+
+        # Resolve movement conflicts
+        for destination, attacks in attacks_by_destination.items():
+            if len(attacks) == 1:
+                successful_moves.append(attacks[0])
+                continue
+
+            strengths = []
+
+            for attack in attacks:
+                strength = attack_strength[(attack.unit_location, attack.target)]
+                strengths.append((strength, attack))
+
+            strengths.sort(key=lambda x: x[0], reverse=True)
+
+            best_strength = strengths[0][0]
+
+            top = [x for x in strengths if x[0] == best_strength]
+
+            if len(top) > 1:
+                for _, attack in top:
+                    bounced_moves.append(attack)
+                    order_results[attack.unit_location] = ["bounce"]
+            else:
+                successful_moves.append(top[0][1])
+
+        # Apply successful moves simultaneously
+        new_positions = {}
+
+        for pid, units in self.units.items():
+            for unit in units:
+                new_positions[unit["location"]] = unit
+
+        for move in successful_moves:
+            pid, unit = self.get_unit_at(move.unit_location)
+
+            if unit is None:
+                continue
+
+            old_location = unit["location"]
+            new_location = move.target
+
+            unit["location"] = new_location
+
+            order_results[old_location] = []
+
+        # Holds
+        for hold in hold_orders:
+            order_results[hold.unit_location] = []
+
+        return 
+    
+    def advance_phase(self):
+        self.phase_index += 1
+
+        if self.phase_index >= len(self.phase_cycle):
+            self.phase_index = 0
+            self.year += 1
+
+        self.phase = self.phase_cycle[self.phase_index]
+
+    def record_phase(self, orders, results):
+        phase_record = {
+            "name": f"{self.phase}_{self.year}",
+            "state": self.export_state(),
+            "orders": {},
+            "results": results,
+            "messages": []
+        }
+
+        for pid, order_list in orders.items():
+            phase_record["orders"][str(pid)] = []
+
+            for order in order_list:
+                if order.order_type == "MOVE":
+                    text = f"{order.unit_location} - {order.target}"
+
+                elif order.order_type == "HOLD":
+                    text = f"{order.unit_location} H"
+
+                elif order.order_type == "SUPPORT":
+                    text = (
+                        f"{order.unit_location} S "
+                        f"{order.support_unit} - {order.support_target}"
+                    )
+
+                else:
+                    text = "UNKNOWN"
+
+                phase_record["orders"][str(pid)].append(text)
+
+        self.history.append(phase_record)
+
+    def step(self, joint_orders):
+        self.submit_orders(joint_orders)
+
+        results = self.resolve_orders()
+        
+        if self.phase == "Fall_Movement":
+            self.update_supply_center_control()
+
+        self.record_phase(joint_orders, results)
+
+        self.advance_phase()
+
+        observations = self.build_all_observations()
+
+        rewards = self.compute_rewards()
+
+        done = self.check_victory() is not None
+        
+        info = {
+            "history_size": len(self.history)
+        }
+
+        return observations, rewards, done, info
+
+    def compute_rewards(self):
+        rewards = {}
+
+        for pid in range(1, self.num_players + 1):
+            rewards[pid] = self.count_supply_centers(pid)
+
+        return rewards
+    
+    def build_observation(self, player_id):
+        obs = {
+            "phase": self.phase,
+            "year": self.year,
+            "owned_centers": [],
+            "friendly_units": [],
+            "enemy_units": []
+        }
+
+        for province, owner in self.supply_centers.items():
+            if owner == player_id:
+                obs["owned_centers"].append(province)
+
+        for pid, units in self.units.items():
+            for unit in units:
+                data = {
+                    "type": unit["type"],
+                    "location": unit["location"]
+                }
+
+                if pid == player_id:
+                    obs["friendly_units"].append(data)
+                else:
+                    obs["enemy_units"].append(data)
+
+    def build_all_observations(self):
+        return {
+            pid: self.build_observation(pid)
+            for pid in range(1, self.num_players + 1)
+        }
+    
+    def export_game_json(self):
+        return {
+            "map": "colonial",
+            "phases": self.history
+        }
+    
+    def save_game(self, filepath):
+        with open(filepath, "w") as f:
+            json.dump(self.export_game_json(), f, indent=2)
+
     def main():
         print("Creating Colonial Diplomacy Environment\n")
         env = ColonialDiplomacyEnv()
@@ -902,3 +1149,20 @@ class ColonialDiplomacyEnv(gym.Env):
 
 if __name__ == "__main__":
     ColonialDiplomacyEnv.main()
+
+@dataclass
+class Order:
+    player_id: int
+    unit_location: str
+    order_type: str
+
+    target: str | None = None
+
+    support_unit: str | None = None
+    support_target: str | None = None
+
+    convoy_origin: str | None = None
+    convoy_destination: str | None = None
+
+    via_tsr: bool = False
+    via_suez: bool = False
