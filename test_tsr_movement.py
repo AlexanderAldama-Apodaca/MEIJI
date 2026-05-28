@@ -9,7 +9,7 @@ def test_tsr_movement():
     env.units[6].append({"type": "Army", "location": "Omsk"})
 
     orders = {
-        1: [Order(6, "Omsk", "MOVE", target="Irkutsk", via_tsr=True)]
+        6: [Order(6, "Omsk", "MOVE", target="Irkutsk", via_tsr=True)]
     }
 
     env.submit_orders(orders)
@@ -18,7 +18,7 @@ def test_tsr_movement():
 
     pid, unit = env.get_unit_at("Irkutsk")
 
-    assert pid == 1
+    assert pid == 6
 
     print("test_tsr_movement passed")
 
