@@ -978,19 +978,47 @@ class ColonialDiplomacyEnv(gym.Env):
         attack_strength = defaultdict(lambda: 1)
         defense_strength = defaultdict(lambda: 1)
 
-        for order in support_orders:
-            if order.support_target is None:
+        # Determine which supports are cut
+        cut_supports = set()
+
+        for support in support_orders:
+            support_location = support.unit_location
+
+            for move in move_orders:
+                # Unit attacks supporting unit
+                if move.target == support_location:
+                    # Exception: support is not cut if attack comes from province support is directed against
+                    if (support.support_target is not None and move.unit_location == support.support_target):
+                        continue
+
+                    cut_supports.add(support.unit_location)
+
+        # Apply valid supports
+        for support in support_orders:
+            # Ignore cut supports
+            if support.unit_location in cut_supports:
+                order_results[support.unit_location] = ["cut"]
                 continue
 
-            if order.support_target == order.unit_location:
+            # Support hold
+            if support.support_target is None:
+                defense_strength[support.support_unit] += 1
                 continue
 
-            attack_strength[(order.support_unit, order.support_target)] += 1
+            # Prevent self-support
+            if support.support_target == support.unit_location:
+                continue
+
+            # Support move
+            attack_strength[(support.support_unit, support.support_target)] += 1
 
         # Collect attacks by destination
         attacks_by_destination = defaultdict(list)
 
         for order in move_orders:
+            if order.target is None:
+                continue
+
             attacks_by_destination[order.target].append(order)
 
         successful_moves = []
@@ -998,28 +1026,52 @@ class ColonialDiplomacyEnv(gym.Env):
 
         # Resolve movement conflicts
         for destination, attacks in attacks_by_destination.items():
-            if len(attacks) == 1:
-                successful_moves.append(attacks[0])
+            if len(attacks) == 0:
                 continue
 
-            strengths = []
+            defender_pid, defender_unit = self.get_unit_at(destination)
+
+            if defender_unit is not None:
+                defender_strength = defense_strength[destination]
+
+            else:
+                defender_strength = 0
+
+            evaluated = []
 
             for attack in attacks:
                 strength = attack_strength[(attack.unit_location, attack.target)]
-                strengths.append((strength, attack))
 
-            strengths.sort(key=lambda x: x[0], reverse=True)
+                evaluated.append((strength, attack))
 
-            best_strength = strengths[0][0]
+            evaluated.sort(key=lambda x: x[0], reverse=True)
 
-            top = [x for x in strengths if x[0] == best_strength]
+            best_strength = evaluated[0][0]
 
-            if len(top) > 1:
-                for _, attack in top:
+            strongest = [x for x in evaluated if x[0] == best_strength]
+
+            # Bounce between attackers
+            if len(strongest) > 1:
+                for _, attack in strongest:
                     bounced_moves.append(attack)
+
                     order_results[attack.unit_location] = ["bounce"]
-            else:
-                successful_moves.append(top[0][1])
+
+                continue
+
+            winning_strength, winning_attack = strongest[0]
+
+            # Defender holds
+            if defender_strength >= winning_strength:
+                bounced_moves.append(winning_attack)
+
+                order_results[winning_attack.unit_location] = ["bounce"]
+
+                continue
+
+            successful_moves.append(winning_attack)
+
+            order_results[winning_attack.unit_location] = []
 
         # Apply successful moves simultaneously
         new_positions = {}
