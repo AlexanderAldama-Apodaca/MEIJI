@@ -553,7 +553,7 @@ class ColonialDiplomacyEnv(gym.Env):
         current_location = order.unit_location
 
         # Adjacency check
-        if (order.target not in self.adjacencies[current_location]):
+        if (order.target not in self.adjacency[current_location]):
             return False
         
         return True
