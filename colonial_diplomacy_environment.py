@@ -552,10 +552,36 @@ class ColonialDiplomacyEnv(gym.Env):
         
         current_location = order.unit_location
 
-        # Adjacency check
+        # Normal adjacency movement
         if (order.target not in self.adjacency[current_location]):
-            return False
-        
+            # TSR special movement
+            if order.via_tsr:
+                if not self.is_valid_tsr_move(order):
+                    return False
+                
+            # Suez special movement
+            elif order.via_suez:
+                if not self.is_valid_suez_move(order):
+                    return False
+                
+            else:
+                return False
+
+        return True
+    
+    def is_valid_tsr_move(self, order):
+        """
+        Validate Trans-Siberian Railroad movement.
+        """
+        # Simplified initial implementation
+        return True
+    
+    def is_valid_suez_move(self, order):
+        """
+        Validate Suez Canal movement.
+        """
+
+        # Simplified initial implementation
         return True
         
     def get_legal_retreat_locations(self, unit: Dict[str, object], attacker_origin: str, standoff_provinces: set) -> List[str]:
