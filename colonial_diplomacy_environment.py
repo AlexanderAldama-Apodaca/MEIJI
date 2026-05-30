@@ -43,6 +43,10 @@ class ColonialDiplomacyEnv(gym.Env):
         self.tsr_used_this_turn: bool = False
         self.suez_permissions: Dict[int, set] = {}
 
+        self.pending_orders = {}
+
+        self.pending_retreats = []
+
         self.invalid_orders = {}
 
         # Board representation
@@ -622,6 +626,30 @@ class ColonialDiplomacyEnv(gym.Env):
             legal_retreats.append(province)
 
         return legal_retreats
+    
+    def get_retreat_options(self, province, attacker_origin):
+        """
+        Generate legal retreat locations.
+        """
+
+        options = []
+
+        adjacent = self.adjacency[province]
+
+        for adj in adjacent:
+            # Cannot retreat to attacker's origin
+            if adj == attacker_origin:
+                continue
+
+            # Cannot retreat to occupied province
+            pid, unit = self.get_unit_at(adj)
+
+            if unit is not None:
+                continue
+
+            options.append(adj)
+
+        return options
         
     def retreat_unit(self, player_id: int, unit_location: str, attacker_origin: str, standoff_provinces: set, chosen_retreat: str | None) -> bool:
         """
@@ -1129,6 +1157,14 @@ class ColonialDiplomacyEnv(gym.Env):
                 order_results[winning_attack.unit_location] = ["bounce"]
 
                 continue
+
+            # Defender dislodged
+            if defender_unit is not None:
+                retreat_options = self.get_retreat_options(destination, winning_attack.unit_location)
+
+                self.pending_retreats.append({"player_id": defender_pid, "unit": defender_unit, "from": destination, "retreat_options": retreat_options})
+
+                order_results[destination] = ["dislodged"]
 
             successful_moves.append(winning_attack)
 
