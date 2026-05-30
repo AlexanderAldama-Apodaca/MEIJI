@@ -1,16 +1,13 @@
-from colonial_diplomacy_environment import(ColonialDiplomacyEnv, Order)
+from colonial_diplomacy_environment import (ColonialDiplomacyEnv, Order)
 
 def test_illegal_move():
     env = ColonialDiplomacyEnv()
 
-    for pid in env.units:
-        env.units[pid] = []
+    orders = [Order(1, "Punjab", "MOVE", target="Tokyo")]
 
-    env.units[1].append({"type": "Army", "location": "Punjab"})
+    env.pending_orders = {1: orders}
 
-    orders = {Order(1, "Punjab", "MOVE", target="Tokyo")}
-
-    env.submit_orders(orders)
+    results = env.resolve_orders()
 
     assert "Punjab" in env.invalid_orders
 
