@@ -10,14 +10,14 @@ def test_multiple_bounce():
 
     env.units[2].append({"type": "Army", "location": "Delhi"})
 
-    env.units[3].append({"type": "Army", "location": "Lucknow"})
+    env.units[3].append({"type": "Army", "location": "Nagpur"})
 
     orders = {
         1: [Order(1, "Punjab", "MOVE", target="Rajputana")],
 
         2: [Order(2, "Delhi", "MOVE", target="Rajputana")],
 
-        3: [Order(3, "Lucknow", "MOVE", target="Rajputana")]
+        3: [Order(3, "Nagpur", "MOVE", target="Rajputana")]
     }
 
     env.submit_orders(orders)
@@ -26,7 +26,7 @@ def test_multiple_bounce():
 
     assert results["Punjab"] == ["bounce"]
     assert results["Delhi"] == ["bounce"]
-    assert results["Lucknow"] == ["bounce"]
+    assert results["Nagpur"] == ["bounce"]
 
     print("test_multiple_bounce passed")
 
