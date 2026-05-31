@@ -1164,6 +1164,8 @@ class ColonialDiplomacyEnv(gym.Env):
 
                 self.pending_retreats.append({"player_id": defender_pid, "unit": defender_unit, "from": destination, "retreat_options": retreat_options})
 
+                self.remove_unit(defender_pid, destination)
+
                 order_results[destination] = ["dislodged"]
 
             successful_moves.append(winning_attack)
@@ -1195,7 +1197,46 @@ class ColonialDiplomacyEnv(gym.Env):
             order_results[hold.unit_location] = []
 
         return order_results
-    
+
+    def resolve_retreats(self, retreat_orders):
+        """
+        Resolve retreat orders simultaneously.
+        """
+
+        retreats_by_destination = defaultdict(list)
+
+        for order in retreat_orders:
+            retreats_by_destination[order.target].append(order)
+
+        for destination, orders in retreats_by_destination.items():
+
+            # Retreat conflict: all units already removed from board
+            if len(orders) > 1:
+                continue
+
+            order = orders[0]
+
+            retreat_entry = None
+
+            for retreat in self.pending_retreats:
+                if (retreat["from"] == order.unit_location):
+                    retreat_entry = retreat
+                    break
+
+            if retreat_entry is None:
+                continue
+
+            unit = retreat_entry["unit"]
+
+            unit["location"] = destination
+
+            self.units[retreat_entry["player_id"]].append(unit)
+
+        self.pending_retreats = []
+
+    def remove_unit(self, player_id, location):
+        self.units[player_id] = [unit for unit in self.units[player_id] if unit["location"] != location]
+
     def advance_phase(self):
         self.phase_index += 1
 
