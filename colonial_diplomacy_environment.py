@@ -556,23 +556,64 @@ class ColonialDiplomacyEnv(gym.Env):
         
         current_location = order.unit_location
 
-        # Normal adjacency movement
-        if (order.target not in self.adjacency[current_location]):
-            # TSR special movement
-            if order.via_tsr:
-                if not self.is_valid_tsr_move(order):
-                    return False
-                
-            # Suez special movement
-            elif order.via_suez:
-                if not self.is_valid_suez_move(order):
-                    return False
-                
-            else:
+        # Standard adjacent movement
+        if order.target in self.adjacency[current_location]:
+            return True
+        
+        # Convoy movement
+        if order.via_convoy:
+            # Only armies may convoy
+            if unit["type"] != "Army":
                 return False
+            
+            if self.has_convoy_path(current_location, order.target):
+                return True
+            
+            return False
+        
+        # TSR special movement
+        if order.via_tsr:
+            return self.is_valid_tsr_move(order)
 
-        return True
+        # Suez special movement
+        if order.via_suez:
+            return self.is_valid_suez_move(order)
+        
+        return False
     
+    def has_convoy_path(self, start, destination):
+        """
+        Basic convoy route detection.
+        """
+
+        visited = set()
+
+        queue = deque([start])
+
+        while queue:
+            current = queue.popleft()
+
+            if current == destination:
+                return True
+
+            visited.add(current)
+
+            for adjacent in self.adjacency[current]:
+                if adjacent in visited:
+                    continue
+
+                pid, unit = self.get_unit_at(adjacent)
+
+                # Convoy fleets
+                if (unit is not None and unit["type"] == "Fleet"):
+                    queue.append(adjacent)
+
+                # Destination province
+                elif adjacent == destination:
+                    queue.append(adjacent)
+
+        return False
+
     def is_valid_tsr_move(self, order):
         """
         Validate Trans-Siberian Railroad movement.
@@ -1374,5 +1415,6 @@ class Order:
     convoy_origin: str | None = None
     convoy_destination: str | None = None
 
+    via_convoy: bool = False
     via_tsr: bool = False
     via_suez: bool = False
