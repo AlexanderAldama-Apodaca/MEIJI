@@ -1080,8 +1080,11 @@ class ColonialDiplomacyEnv(gym.Env):
         move_orders = []
         hold_orders = []
         support_orders = []
+        convoy_orders = []
 
         order_results = {}
+
+        dislodged_units = set()
 
         # Categorize orders
         for pid, orders in self.pending_orders.items():
@@ -1103,6 +1106,9 @@ class ColonialDiplomacyEnv(gym.Env):
                 
                 elif order.order_type == "SUPPORT":
                     support_orders.append(order)
+
+                elif order.order_type == "CONVOY":
+                    convoy_orders.append(order)
 
         # Compute support strengths
         attack_strength = defaultdict(lambda: 1)
@@ -1205,6 +1211,8 @@ class ColonialDiplomacyEnv(gym.Env):
 
                 self.pending_retreats.append({"player_id": defender_pid, "unit": defender_unit, "from": destination, "retreat_options": retreat_options})
 
+                dislodged_units.add(destination)
+
                 self.remove_unit(defender_pid, destination)
 
                 order_results[destination] = ["dislodged"]
@@ -1212,6 +1220,21 @@ class ColonialDiplomacyEnv(gym.Env):
             successful_moves.append(winning_attack)
 
             order_results[winning_attack.unit_location] = []
+
+        filtered_successful_moves = []
+
+        for move in successful_moves:
+            if move.via_convoy:
+                disrupted = self.convoy_fleet_dislodged(move, convoy_orders, dislodged_units)
+
+                if disrupted:
+                    order_results[move.unit_location] = ["bounce"]
+
+                    continue
+
+            filtered_successful_moves.append(move)
+
+        successful_moves = filtered_successful_moves
 
         # Apply successful moves simultaneously
         new_positions = {}
@@ -1238,6 +1261,17 @@ class ColonialDiplomacyEnv(gym.Env):
             order_results[hold.unit_location] = []
 
         return order_results
+    
+    def convoy_fleet_dislodged(self, move_order, convoy_orders, dislodged_units):
+        """
+        Determine whether a convoy route was disrupted by fleet dislodgement.
+        """
+        for convoy in convoy_orders:
+            if (convoy.convoy_origin == move_order.unit_location and convoy.convoy_destination == move_order.target):
+                if convoy.unit_location in dislodged_units:
+                    return True
+                
+        return False
 
     def resolve_retreats(self, retreat_orders):
         """
