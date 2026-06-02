@@ -12,7 +12,9 @@ def test_suez_movement():
         1: [Order(1, "Red_Sea", "MOVE", target="Mediterranean_Sea", via_suez=True)]
     }
 
-    env.submit_orders()
+    env.submit_orders(orders)
+
+    results = env.resolve_orders()
 
     pid, unit = env.get_unit_at("Mediterranean_Sea")
 
