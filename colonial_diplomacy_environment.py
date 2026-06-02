@@ -626,8 +626,24 @@ class ColonialDiplomacyEnv(gym.Env):
         Validate Suez Canal movement.
         """
 
-        # Simplified initial implementation
-        return True
+        current = order.unit_location
+        target = order.target
+
+        pid, unit = self.get_unit_at(current)
+
+        if unit is None:
+            return False
+
+        # Only fleets may use Suez
+        if unit["type"] != "Fleet":
+            return False
+
+        valid_pairs=[
+            ("Red_Sea", "Mediterranean_Sea"),
+            ("Mediterranean_Sea", "Red_Sea")
+        ]
+
+        return (current, target) in valid_pairs
         
     def get_legal_retreat_locations(self, unit: Dict[str, object], attacker_origin: str, standoff_provinces: set) -> List[str]:
         """
