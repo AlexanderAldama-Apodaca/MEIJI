@@ -233,6 +233,16 @@ class ColonialDiplomacyEnv(gym.Env):
             ]
         }
 
+        self.controlled_supply_centers = {
+            1: ["Delhi", "Madras", "Bombay", "Hong_Kong", "Aden", "Singapore"],
+            2: ["Peking", "Shanghai", "Canton", "Manchuria", "Sinkiang"],
+            3: ["Tongking", "Annam", "Cochin"],
+            4: ["Borneo", "Java", "Sumatra"],
+            5: ["Tokyo", "Otaru", "Kyushu", "Kyoto"],
+            6: ["Moscow", "Omsk", "Vladivostok", "Odessa", "Port_Arthur"],
+            7: ["Angora", "Baghdad", "Constantinople"]
+        }
+
         # Supply center ownership: {province: player_id}
         self.supply_centers: Dict[str, int] = {
             # Britain
@@ -1025,6 +1035,28 @@ class ColonialDiplomacyEnv(gym.Env):
 
     def count_supply_centers(self, player_id: int) -> int:
         return sum(1 for owner in self.supply_centers.values() if owner == player_id)
+    
+    def get_home_supply_centers(self, player_id):
+        """
+        Return all home supply centers belonging to a player.
+        """
+        return [province for province, owner in self.home_supply_centers.items() if owner == player_id]
+    
+    def is_coastal_home_supply_center(self, province):
+        """
+        Determine whether a province is coastal.
+        """
+        coastal_home_supply_centers = {
+            "Bombay", "Madras", "Hong_Kong", "Aden", "Singapore",
+            "Shanghai", "Canton", "Manchuria",
+            "Tongking", "Annam", "Cochin",
+            "Borneo", "Java", "Sumatra",
+            "Tokyo", "Otaru", "Kyushu", "Kyoto",
+            "Vladivostok", "Odessa", "Port_Arthur",
+            "Angora", "Baghdad", "Constantinople"
+        }
+
+        return province in coastal_home_supply_centers
         
     def start_new_turn(self):
         self.tsr_used_this_turn = False
@@ -1325,6 +1357,57 @@ class ColonialDiplomacyEnv(gym.Env):
 
         self.pending_retreats = []
 
+    def resolve_builds(self, build_orders):
+        """
+        Resolve Winter build orders.
+        """
+        for order in build_orders:
+            if order.order_type != "BUILD":
+                continue
+
+            player_id = order.player_id
+            build_location = order.target
+
+            # Province must exist
+            if build_location not in self.provinces:
+                continue
+
+            # Must be a home center
+            if (self.home_supply_centers.get(build_location) != player_id):
+                continue
+
+            # Must currently be controlled
+            if (build_location not in self.controlled_supply_centers[player_id]):
+                continue
+
+            # Province must be empty
+            pid, unit = self.get_unit_at(build_location)
+
+            if unit is not None:
+                continue
+            
+            # Build limit
+            unit_count = len(self.units[player_id])
+
+            supply_count = len(self.controlled_supply_centers[player_id])
+
+            available_builds = (supply_count - unit_count)
+
+            if available_builds <= 0:
+                continue
+
+            # Unit type
+            build_type = getattr(order, "build_type", "Army")
+
+            # Fleet legality
+            if build_type == "Fleet":
+                if not self.is_coastal(build_location):
+                    continue
+
+            new_unit = {"type": build_type, "location": build_location, "strength": 1}
+
+            self.units[player_id].append(new_unit)
+
     def remove_unit(self, player_id, location):
         self.units[player_id] = [unit for unit in self.units[player_id] if unit["location"] != location]
 
@@ -1468,3 +1551,5 @@ class Order:
     via_convoy: bool = False
     via_tsr: bool = False
     via_suez: bool = False
+
+    build_type: str | None = None
