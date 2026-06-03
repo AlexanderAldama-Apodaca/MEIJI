@@ -1,25 +1,54 @@
-from colonial_diplomacy_environment import (ColonialDiplomacyEnv)
+from colonial_diplomacy_environment import (
+    ColonialDiplomacyEnv,
+    Order
+)
 
 def test_builds():
+
     env = ColonialDiplomacyEnv()
 
-    player = 1
+    player_id = 1
 
-    env.supply_centers["Delhi"] = player
+    # Give Britain an extra controlled SC
+    env.controlled_supply_centers[player_id].append(
+        "Karachi"
+    )
 
-    env.units[player] = []
+    # Add Karachi as a temporary home center
+    env.home_supply_centers["Karachi"] = player_id
 
-    builds_before = len(env.units[player])
+    # Ensure Karachi empty
+    env.units[player_id] = [
+        u for u in env.units[player_id]
+        if u["location"] != "Karachi"
+    ]
 
-    env.build_unit(player, "Army", "Delhi")
+    builds_before = len(
+        env.units[player_id]
+    )
 
-    builds_after = len(env.units[player])
+    build_orders = [
+        Order(
+            player_id,
+            None,
+            "BUILD",
+            target="Karachi",
+            build_type="Army"
+        )
+    ]
+
+    env.resolve_builds(build_orders)
+
+    builds_after = len(
+        env.units[player_id]
+    )
 
     assert builds_after == builds_before + 1
 
-    pid, unit = env.get_unit_at("Delhi")
+    pid, unit = env.get_unit_at("Karachi")
 
-    assert pid == player
+    assert pid == player_id
+    assert unit["type"] == "Army"
 
     print("test_builds passed")
 
