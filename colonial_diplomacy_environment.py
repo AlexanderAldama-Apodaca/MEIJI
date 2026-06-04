@@ -756,28 +756,25 @@ class ColonialDiplomacyEnv(gym.Env):
         unit["location"] = chosen_retreat
         return True
 
-    def disband_unit(self, player_id: int, unit_idx: int) -> bool:
+    def disband_unit(self, player_id, location):
         """
-        Removes a unit from the game.
-        Returns True if the unit was successfully disbanded.
+        Remove a unit belonging to a player at a specific location.
         """
 
-        # Validate player
-        if player_id not in self.units:
-            return False
-        
-        # Validate unit index
-        if unit_idx < 0 or unit_idx >= len(self.units[player_id]):
-            return False
-        
-        # Remove the unit
-        self.units[player_id].pop(unit_idx)
+        remaining_units = []
 
-        # Remove eliminated player
-        if len(self.units[player_id]) == 0:
-            del self.units[player_id]
+        removed = False
 
-        return True
+        for unit in self.units[player_id]:
+            if (unit["location"] == location and not removed):
+                removed = True
+                continue
+
+            remaining_units.append(unit)
+
+        self.units[player_id] = remaining_units
+
+        return removed
         
     def is_province_occupied(self, province: str) -> bool:
         for units in self.units.values():
@@ -1407,6 +1404,16 @@ class ColonialDiplomacyEnv(gym.Env):
             new_unit = {"type": build_type, "location": build_location, "strength": 1}
 
             self.units[player_id].append(new_unit)
+
+    def resolve_disbands(self, disband_orders):
+        """
+        Resolve Winter disband orders.
+        """
+        for order in disband_orders:
+            if order.order_type != "DISBAND":
+                continue
+
+            self.disband_unit(order.player_id, order.target)
 
     def remove_unit(self, player_id, location):
         self.units[player_id] = [unit for unit in self.units[player_id] if unit["location"] != location]
