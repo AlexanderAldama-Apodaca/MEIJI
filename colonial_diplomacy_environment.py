@@ -344,6 +344,15 @@ class ColonialDiplomacyEnv(gym.Env):
 
         self.tsr_path = ["Moscow", "Perm", "Omsk", "Krasnoyarsk", "Irkutsk", "Vladivostok"]
 
+        self.tsr_adjacency = {
+            "Moscow": ["Perm", "Omsk", "Krasnoyarsk", "Irkutsk", "Vladivostok"],
+            "Perm": ["Moscow", "Omsk", "Krasnoyarsk", "Irkutsk", "Vladivostok"],
+            "Omsk": ["Moscow", "Perm", "Krasnoyarsk", "Irkutsk", "Vladivostok"],
+            "Krasnoyarsk": ["Moscow", "Perm", "Omsk", "Irkutsk", "Vladivostok"],
+            "Irkutsk": ["Moscow", "Perm", "Omsk", "Krasnoyarsk", "Vladivostok"],
+            "Vladivostok": ["Moscow", "Perm", "Omsk", "Krasnoyarsk", "Irkutsk"]
+        }
+
     def move_unit(self, player_id: int, unit_index: int, destination: str) -> bool:
         """
         Attempts to move a unit to a destination province.
@@ -628,7 +637,35 @@ class ColonialDiplomacyEnv(gym.Env):
         """
         Validate Trans-Siberian Railroad movement.
         """
-        # Simplified initial implementation
+        # Only Russia may use TSR
+        if order.player_id != 6:
+            return False
+        
+        # Unit must exist
+        pid, unit = self.get_unit_at(order.unit_location)
+        
+        if unit is None:
+            return False
+        
+        # Only armies may use TSR
+        if unit["type"] != "Army":
+            return False
+        
+        origin = order.unit_location
+        destination = order.target
+        
+        # Origin must be TSR-connected
+        if origin not in self.tsr_adjacency:
+            return False
+        
+        # Destination must be TSR-connected
+        if destination not in self.tsr_adjacency:
+            return False
+        
+        # Must be directly connected by TSR
+        if (destination not in self.tsr_adjacency[origin]):
+            return False
+        
         return True
     
     def is_valid_suez_move(self, order):
