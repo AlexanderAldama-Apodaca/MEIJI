@@ -827,7 +827,7 @@ class ColonialDiplomacyEnv(gym.Env):
         """
 
         # Phase check
-        if self.phase != "Build":
+        if self.phase != "Winter_Adjustment":
             return False
         
         # Home supply center ownership check
@@ -1025,6 +1025,15 @@ class ColonialDiplomacyEnv(gym.Env):
         unit_pid, unit = self.get_unit_at(start)
         unit["location"] = destination
         return True
+    
+    def reset_unit_strengths(self):
+        for pid, units in self.units.items():
+            for unit in units:
+                unit["strength"] = 1
+
+        for pid, units in self.units.items():
+            for unit in units:
+                assert unit["strength"] == 1
 
     def get_canonical_supply_center(self, province: str) -> str:
         temp_province = province
@@ -1114,7 +1123,7 @@ class ColonialDiplomacyEnv(gym.Env):
             self.winner = winner
             return
             
-        self.phase = "Build"
+        self.phase = "Winter_Adjustment"
 
     def export_state(self):
         units_export = {}
@@ -1506,6 +1515,8 @@ class ColonialDiplomacyEnv(gym.Env):
 
         self.record_phase(joint_orders, results)
 
+        self.reset_unit_strengths()
+
         self.advance_phase()
 
         observations = self.build_all_observations()
@@ -1552,6 +1563,8 @@ class ColonialDiplomacyEnv(gym.Env):
                     obs["friendly_units"].append(data)
                 else:
                     obs["enemy_units"].append(data)
+
+        return obs
 
     def build_all_observations(self):
         return {
