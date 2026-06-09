@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 from colonial_diplomacy_environment import Order
 from colonial_diplomacy_environment import ColonialDiplomacyEnv
@@ -56,7 +57,11 @@ class RandomColonialAgent:
 
         return orders
     
-    def run_game(max_turns=100):
+def run_game(max_turns=100, seed=None):
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+        
         env = ColonialDiplomacyEnv()
 
         agents = {
@@ -77,4 +82,11 @@ class RandomColonialAgent:
 
             turn += 1
 
-        return env
+        winner = env.check_victory()
+
+        return {
+            "env": env,
+            "turns": turn,
+            "winner": env.check_victory(),
+            "history": env.history
+        }
