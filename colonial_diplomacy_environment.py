@@ -1575,7 +1575,10 @@ class ColonialDiplomacyEnv(gym.Env):
     def export_game_json(self):
         return {
             "map": "colonial",
-            "phases": self.history
+            "winner": self.check_victory(),
+            "year": self.year,
+            "phase": self.phase,
+            "history": self.history
         }
     
     def save_game(self, filepath):
