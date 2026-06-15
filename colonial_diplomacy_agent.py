@@ -160,8 +160,8 @@ class TDColonialAgent:
             orders.append(Order(player_id=player_id, unit_location=location, order_type="MOVE", target=best_target))
 
         return orders
-    
-    def run_td_game(max_turns=100, seed=None):
+
+def run_td_game(max_turns=100, seed=None):
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -180,17 +180,17 @@ class TDColonialAgent:
             previous_states = {}
 
             for pid, agent in agents.items():
-                previous_states[pid] = (agent.get_state_key(env, pid))
+                previous_states[pid] = agent.get_state_key(env, pid)
 
             joint_orders = {}
 
             for pid, agent in agents.items():
-                joint_orders[pid] = (agent.generate_orders(env, pid))
+                joint_orders[pid] = agent.generate_orders(env, pid)
 
-            observations, rewards, done, info = (env.step(joint_orders))
+            observations, rewards, done, info = env.step(joint_orders)
 
             for pid, agent in agents.items():
-                next_state = (agent.get_state_key(env, pid))
+                next_state = agent.get_state_key(env, pid)
 
                 reward = rewards[pid]
 
@@ -198,8 +198,10 @@ class TDColonialAgent:
 
             turn += 1
 
+        winner = env.check_victory()
+
         return {
             "turns": turn,
-            "winner": env.check_victory(),
+            "winner": winner,
             "history": env.history
         }
