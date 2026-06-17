@@ -5,55 +5,65 @@ from colonial_diplomacy_environment import Order
 from colonial_diplomacy_environment import ColonialDiplomacyEnv
 
 class RandomColonialAgent:
+    def generate_candidate_orders(self, env, player_id, unit):
+        orders = []
+
+        location = unit["location"]
+
+        candidates = env.adjacency.get(location, [])
+
+        # HOLD
+        orders.append(Order(player_id=player_id, unit_location=location, order_type="HOLD"))
+
+        # MOVE
+        for target in candidates:
+            if env.can_unit_move_to(unit["type"], target):
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="MOVE", target=target))
+
+        # SUPPORT HOLD
+        for friendly_unit in env.units.get(player_id, []):
+            support_location = friendly_unit["location"]
+
+            if support_location == location:
+                continue
+
+            if support_location in candidates:
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="SUPPORT", support_unit=support_location, support_target=support_location))
+
+        # SUPPORT MOVE
+        for friendly_unit in env.units.get(player_id, []):
+            support_origin = friendly_unit["location"]
+
+            if support_origin == location:
+                continue
+
+            for support_destination in env.adjacency.get(support_origin, []):
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="SUPPORT", support_unit=support_origin, support_target=support_destination))
+
+        # CONVOY
+        if unit["type"] == "Fleet":
+            for friendly_unit in env.units.get(player_id, []):
+                if friendly_unit["type"] != "Army":
+                    continue
+
+                army_location = friendly_unit["location"]
+
+                for destination in env.adjacency.get(army_location, []):
+                    orders.append(Order(player_id=player_id, unit_location=location, order_type="CONVOY", convoy_origin=army_location, convoy_destination=destination))
+
+        return orders
+
     def generate_orders(self, env, player_id):
         orders = []
 
         units = env.units.get(player_id, [])
 
         for unit in units:
-            location = unit["location"]
+            candidates = self.generate_candidate_orders(env, player_id, unit)
 
-            candidates = env.adjacency.get(location, [])
+            chosen_order = random.choice(candidates)
 
-            # Hold probability
-            if random.random() < 0.3:
-                orders.append(
-                    Order(
-                        player_id=player_id,
-                        unit_location=location,
-                        order_type="HOLD"
-                    )
-                )
-
-                continue
-
-            legal_moves = []
-
-            for target in candidates:
-                if env.can_unit_move_to(unit["type"], target):
-                    legal_moves.append(target)
-
-            if not legal_moves:
-                orders.append(
-                    Order(
-                        player_id=player_id,
-                        unit_location=location,
-                        order_type="HOLD"
-                    )
-                )
-                
-                continue
-
-            destination = random.choice(legal_moves)
-
-            orders.append(
-                Order(
-                    player_id=player_id,
-                    unit_location=location,
-                    order_type="MOVE",
-                    target=destination
-                )
-            )
+            orders.append(chosen_order)
 
         return orders
     
@@ -120,6 +130,77 @@ class TDColonialAgent:
 
         self.value_table[state] = (current_value + self.alpha * td_error)
 
+    def evaluate_order(self, env, player_id, order):
+        score = 0
+
+        if order.order_type == "HOLD":
+            score += 1
+
+        elif order.order_type == "MOVE":
+            if order.target in env.supply_centers:
+                score += 10
+            else:
+                score += 2
+
+        elif order.order_type == "SUPPORT":
+            if order.support_unit == order.support_target:
+                score += 5
+            else:
+                score += 7
+
+        elif order.order_type == "CONVOY":
+            score += 4
+
+        return score
+
+    def generate_candidate_orders(self, env, player_id, unit):
+        orders = []
+
+        location = unit["location"]
+
+        candidates = env.adjacency.get(location, [])
+
+        # HOLD
+        orders.append(Order(player_id=player_id, unit_location=location, order_type="HOLD"))
+
+        # MOVE
+        for target in candidates:
+            if env.can_unit_move_to(unit["type"], target):
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="MOVE", target=target))
+
+        # SUPPORT HOLD
+        for friendly_unit in env.units.get(player_id, []):
+            support_location = friendly_unit["location"]
+
+            if support_location == location:
+                continue
+
+            if support_location in candidates:
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="SUPPORT", support_unit=support_location, support_target=support_location))
+
+        # SUPPORT MOVE
+        for friendly_unit in env.units.get(player_id, []):
+            support_origin = friendly_unit["location"]
+
+            if support_origin == location:
+                continue
+
+            for support_destination in env.adjacency.get(support_origin, []):
+                orders.append(Order(player_id=player_id, unit_location=location, order_type="SUPPORT", support_unit=support_origin, support_target=support_destination))
+
+        # CONVOY
+        if unit["type"] == "Fleet":
+            for friendly_unit in env.units.get(player_id, []):
+                if friendly_unit["type"] != "Army":
+                    continue
+
+                army_location = friendly_unit["location"]
+
+                for destination in env.adjacency.get(army_location, []):
+                    orders.append(Order(player_id=player_id, unit_location=location, order_type="CONVOY", convoy_origin=army_location, convoy_destination=destination))
+
+        return orders
+
     def generate_orders(self, env, player_id):
         # Exploration
         if random.random() < self.epsilon:
@@ -130,34 +211,19 @@ class TDColonialAgent:
         units = env.units.get(player_id, [])
 
         for unit in units:
-            location = unit["location"]
+            candidate_orders = self.generate_candidate_orders(env, player_id, unit)
 
-            candidates = env.adjacency.get(location, [])
-
-            legal_moves = []
-
-            for target in candidates:
-                if env.can_unit_move_to(unit["type"], target):
-                    legal_moves.append(target)
-
-            if not legal_moves:
-                orders.append(Order(player_id=player_id, unit_location=location, order_type="HOLD"))
-                continue
-
-            best_target = None
+            best_order = None
             best_score = float("-inf")
 
-            for target in legal_moves:
-                score = 0
-
-                if target in env.supply_centers:
-                    score += 1
+            for order in candidate_orders:
+                score = self.evaluate_order(env, player_id, order)
 
                 if score > best_score:
                     best_score = score
-                    best_target = target
+                    best_order = order
 
-            orders.append(Order(player_id=player_id, unit_location=location, order_type="MOVE", target=best_target))
+            orders.append(best_order)
 
         return orders
 
